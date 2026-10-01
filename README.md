@@ -184,9 +184,18 @@ pi-wallpaper-plugin/
 ## 本地自测 / 打包
 
 ```sh
-node scripts/selftest.mjs        # 73 项断言：apply / next / clear / 自检 / 面板通道 / 面板⇄主进程契约 / 权限被拒 / 遮罩强度 / 提亮 / 顶部 chrome 条带 / 明暗基底 / 重载不丢壁纸 / 恢复正常外观
+node scripts/selftest.mjs        # 75 项断言：apply / next / clear / 自检 / 面板通道 / 面板⇄主进程契约 / 权限被拒 / 遮罩强度 / 提亮 / 顶部 chrome 条带 / 明暗基底 / 重载不丢壁纸 / 恢复正常外观
 node scripts/compat-check.mjs    # 对着真实安装版核对契约（含面板机制）
 ```
 
 打包成可安装的 `.piplug`：在 PI-Desktop 里用 **PluginPack** 工具，或在插件目录上执行校验后打包
 （`.piplug` 必须是 store-only 的 zip，别用系统 `zip`/`tar`）。
+
+## 许可证
+
+MIT License © 2026 Gray379 —— 见 [LICENSE](LICENSE)。
+
+仓库：<https://github.com/Gray379/pi-desktop_wallpaper>
+
+> 再次强调使用前提：本插件为 **PI-Desktop 桌面端**的扩展，需在该桌面端里加载/安装后使用；
+> 桌面端本体不在此仓库内，也不由本项目分发。

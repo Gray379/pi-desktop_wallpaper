@@ -15,6 +15,8 @@
     }
   },
   "author": "local",
+  "license": "MIT",
+  "homepage": "https://github.com/Gray379/pi-desktop_wallpaper",
   "main": "main.js",
   "permissions": [
     "ui.theme",
