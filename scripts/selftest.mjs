@@ -484,6 +484,33 @@ check(
   /id="lift"[^>]*min="0"[^>]*max="60"/.test(panelHtml) && panelHtml.includes('id="lift-val"'),
   ""
 );
+// 技能（contributes.skills）：宿主只索引带 name/description front matter 的文件，
+// 且必须有 agent.prompt.inject 权限，否则文件会被静默忽略。这里把这套契约钉住。
+const skillPaths = manifest.contributes?.skills ?? [];
+check(
+  "manifest 贡献了技能且声明了 agent.prompt.inject",
+  skillPaths.length > 0 && (manifest.permissions ?? []).includes("agent.prompt.inject"),
+  `skills=${skillPaths.join(", ")} permissions=${(manifest.permissions ?? []).join(", ")}`
+);
+for (const rel of skillPaths) {
+  const skillFile = path.join(pluginDir, ...String(rel).split("/"));
+  let text = "";
+  try {
+    text = fs.readFileSync(skillFile, "utf8");
+  } catch (error) {
+    check(`技能文件存在：${rel}`, false, String(error?.message ?? error));
+    continue;
+  }
+  const fm = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text);
+  const name = /^name:\s*(.+)$/m.exec(fm?.[1] ?? "")?.[1]?.trim() ?? "";
+  const description = /^description:\s*(.+)$/m.exec(fm?.[1] ?? "")?.[1]?.trim() ?? "";
+  const bytes = Buffer.byteLength(text, "utf8");
+  check(
+    `技能 ${rel} 的 front matter / 体积合规`,
+    Boolean(fm) && name.length > 0 && description.length > 0 && description.length <= 240 && bytes <= 128 * 1024,
+    `name=${name} 描述 ${description.length} 字符 体积 ${bytes} 字节`
+  );
+}
 // 9) 卸载
 await entry.onUnload();
 check("卸载时注销全部命令", pi.commands.registered.size === 0);

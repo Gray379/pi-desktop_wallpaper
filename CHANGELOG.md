@@ -3,6 +3,16 @@
 本插件是 **PI-Desktop 桌面端**的扩展，所有条目都以「宿主版本 + 插件版本」为准；
 每次桌面端升级后请先跑 `scripts/compat-check.mjs`（或面板里的「兼容性自检」）。
 
+## 0.5.0
+
+- 新增：**Agent 技能** `skills/pi-desktop-plugin-theming.md` —— 把这次做插件时真实踩过的坑固化成可被
+  Agent 按需加载的技能（安装/权限/重载、主题机制六条、不靠肉眼的验证手法）。
+- 新增权限：`agent.prompt.inject`（宿主只索引声明了该权限的技能文件）。
+  **这是宿主标记的高风险权限**，且本插件权限集合发生变化 → 需要重新走一次「卸载 → 加载本地插件 → 同意」。
+  它只用于交付那个纯文本技能，插件不调用任何注入类 API。
+- 自测新增两条守卫：技能文件必须存在、front matter 合规（`name` + `description` ≤240 字符、体积 ≤128 KiB），
+  且 manifest 必须同时声明 `agent.prompt.inject`。
+
 ## 0.4.3
 
 - 修复：会话标题栏（`.main-titlebar` / `.conversation-topbar`）的底色清理曾被误删，
@@ -11,7 +21,7 @@
   `.work-browser-chrome`、`.file-viewer-header`（暗色下它们本来是透明的，属于补漏）。
 - 新增：自测里加「界面区域清单不许弄丢关键组」的守卫断言（含 `titlebars`），
   以及「生成的 CSS 必须包含标题栏清理规则」的断言。
-- 新增：MIT 许可证；GitHub Actions CI（语法检查 + manifest 校验 + 75 项桩宿主自测）。
+- 新增：MIT 许可证；GitHub Actions CI（语法检查 + manifest 校验 + 桩宿主自测）。
 
 ## 0.4.2
 

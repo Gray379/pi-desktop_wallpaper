@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "local.pi-wallpaper",
   "name": "壁纸 · 背景虚化",
-  "version": "0.4.3",
+  "version": "0.5.0",
   "description": "把本地图片当成 PI-Desktop 的整窗壁纸并做背景虚化：图片只被引用路径，不复制、不上传；界面改成毛玻璃，虚化强度、压暗、两侧栏遮罩强度、适配方式都能实时调 —— 两侧栏可以调到「和中间栏完全一样」，也可以只比中间略暗一点。",
   "i18n": {
     "en": {
@@ -20,7 +20,8 @@
   "main": "main.js",
   "permissions": [
     "ui.theme",
-    "ui.panel"
+    "ui.panel",
+    "agent.prompt.inject"
   ],
   "ui": {
     "panel": "renderer/index.html",
@@ -30,6 +31,9 @@
     "piDesktop": ">=0.15.0"
   },
   "contributes": {
+    "skills": [
+      "skills/pi-desktop-plugin-theming.md"
+    ],
     "commands": [
       {
         "id": "local.pi-wallpaper.openPanel",
