@@ -195,6 +195,10 @@ node scripts/compat-check.mjs    # 对着真实安装版核对契约（含面板
 
 MIT License © 2026 Gray379 —— 见 [LICENSE](LICENSE)。
 
+## 更新日志
+
+见 [CHANGELOG.md](CHANGELOG.md)（0.2.x → 0.4.3 的逐版变更与踩过的坑）。
+
 仓库：<https://github.com/Gray379/pi-desktop_wallpaper>
 
 > 再次强调使用前提：本插件为 **PI-Desktop 桌面端**的扩展，需在该桌面端里加载/安装后使用；

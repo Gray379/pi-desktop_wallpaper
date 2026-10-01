@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: 语法检查 + 桩宿主自测
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # 这个插件没有依赖、也不需要构建：能自动验证的东西都在下面三步里。
+      # 注意 scripts/compat-check.mjs 需要本机装的 PI-Desktop（要解包它的 app.asar），
+      # 所以它不进 CI，属于「桌面端升级后在本机跑一次」的工具。
+      - name: 语法检查
+        run: |
+          node --check main.js
+          node --check lib/host-contract.js
+          node --check lib/theme-css.js
+          node --check scripts/selftest.mjs
+          node --check scripts/compat-check.mjs
+
+      - name: manifest.json 可解析
+        run: node -e "const m=JSON.parse(require('fs').readFileSync('manifest.json','utf8'));console.log('manifest OK:',m.id,m.version)"
+
+      - name: 桩宿主自测（75 项断言）
+        run: node scripts/selftest.mjs
