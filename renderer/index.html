@@ -1,0 +1,528 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      chrome v3 = paint-through。宿主对 v2（safe-area）会在顶部铺一条 46px 的“原生拖拽带”，
+      那条在 Windows 上不属于页面合成范围，会显示成一条纯黑（就是窗口按钮下面那块黑底）。
+      v3 下宿主只保留右上角的三个窗口按钮胶囊，顶部这条由本页自己画，
+      并自己标记 -webkit-app-region: drag，所以窗口照样能拖。
+    -->
+    <meta name="pi-plugin-chrome" content="v3" />
+    <title>壁纸 · 背景虚化</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #181818;
+        --surface: #212121;
+        --surface-2: #282828;
+        --fg: #ffffff;
+        --muted: color-mix(in oklab, #ffffff 52%, transparent);
+        --faint: color-mix(in oklab, #ffffff 38%, transparent);
+        --border: color-mix(in oklab, #ffffff 10%, transparent);
+        --hover: color-mix(in oklab, #ffffff 6%, transparent);
+        --accent: #ffffff;
+        --accent-fg: #181818;
+        --danger: #ff6764;
+        --ok: #40c977;
+        --radius: 12px;
+      }
+      :root[data-base="light"] {
+        color-scheme: light;
+        --bg: #ffffff;
+        --surface: #f9f9f9;
+        --surface-2: #f3f3f3;
+        --fg: #1a1c1f;
+        --muted: color-mix(in oklab, #1a1c1f 55%, transparent);
+        --faint: color-mix(in oklab, #1a1c1f 42%, transparent);
+        --border: color-mix(in oklab, #1a1c1f 12%, transparent);
+        --hover: color-mix(in oklab, #1a1c1f 5%, transparent);
+        --accent: #1a1c1f;
+        --accent-fg: #ffffff;
+        --danger: #e02e2a;
+        --ok: #00a240;
+      }
+
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        /* 顶部 46px 是宿主预留的窗口按钮带（v3 下由本页自己画成 .titlebar），内容整体下移 */
+        padding: var(--pi-plugin-titlebar-height, 46px) 18px 18px;
+        overflow: auto;
+        font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+        background: var(--bg);
+        color: var(--fg);
+        user-select: none;
+      }
+      h1 { margin: 0; font-size: 14px; font-weight: 560; letter-spacing: -0.01em; white-space: nowrap; }
+      p { margin: 0; color: var(--muted); }
+      .stack { display: flex; flex-direction: column; gap: 12px; max-width: 720px; }
+      .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+      .grow { flex: 1; min-width: 0; }
+
+      /* 顶部标题栏：本页自己画（chrome v3），既是拖拽区也是视觉过渡 */
+      .titlebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 2147483000;
+        display: flex;
+        height: var(--pi-plugin-titlebar-height, 46px);
+        align-items: center;
+        gap: 10px;
+        /* 右侧给宿主的窗口按钮胶囊留位（96×28，top 9 / right 8） */
+        padding: 0 118px 0 18px;
+        background: var(--bg);
+        -webkit-app-region: drag;
+        app-region: drag;
+        user-select: none;
+      }
+      /* 交互元素一律排除在拖拽区之外 */
+      button, input, select, label, a, summary, [role="button"], [tabindex] {
+        -webkit-app-region: no-drag;
+        app-region: no-drag;
+      }
+      .pill {
+        font-size: 11px;
+        padding: 2px 8px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        color: var(--muted);
+        white-space: nowrap;
+      }
+      .pill.on { color: var(--ok); border-color: color-mix(in oklab, var(--ok) 40%, transparent); }
+
+      .card {
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--surface);
+        padding: 14px;
+      }
+
+      .drop {
+        border: 1px dashed var(--border);
+        border-radius: var(--radius);
+        padding: 26px 18px;
+        text-align: center;
+        cursor: pointer;
+        transition: background 120ms ease, border-color 120ms ease;
+      }
+      .drop:hover, .drop.hot {
+        background: var(--hover);
+        border-color: color-mix(in oklab, var(--accent) 45%, transparent);
+      }
+      .drop b { display: block; font-weight: 560; margin-bottom: 4px; }
+      .drop span { color: var(--faint); font-size: 11.5px; }
+
+      .thumb {
+        width: 100%;
+        height: 108px;
+        border-radius: calc(var(--radius) - 4px);
+        background: var(--surface-2) center/cover no-repeat;
+        border: 1px solid var(--border);
+      }
+      .path {
+        font: 11.5px/1.4 ui-monospace, SFMono-Regular, Consolas, monospace;
+        color: var(--faint);
+        word-break: break-all;
+      }
+      .name { font-weight: 560; }
+
+      label.field { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 190px; }
+      .field-title { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; }
+      .field-title b { color: var(--fg); font-weight: 560; font-variant-numeric: tabular-nums; }
+      input[type="range"] { width: 100%; accent-color: var(--accent); }
+      select {
+        background: var(--surface-2);
+        color: var(--fg);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 6px 8px;
+        font: inherit;
+        width: 100%;
+      }
+      button {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 7px 12px;
+        background: var(--surface-2);
+        color: var(--fg);
+        font: inherit;
+        cursor: pointer;
+        transition: background 120ms ease, opacity 120ms ease;
+      }
+      button:hover { background: var(--hover); }
+      button:focus-visible { outline: 2px solid color-mix(in oklab, var(--accent) 58%, transparent); outline-offset: 2px; }
+      button.primary { background: var(--accent); color: var(--accent-fg); border-color: transparent; }
+      button.primary:hover { opacity: 0.86; background: var(--accent); }
+      button:disabled { opacity: 0.45; cursor: default; }
+
+      .banner {
+        border-radius: 8px;
+        padding: 8px 10px;
+        font-size: 12px;
+        border: 1px solid color-mix(in oklab, var(--danger) 45%, transparent);
+        color: var(--danger);
+        white-space: pre-wrap;
+      }
+      .banner[hidden] { display: none; }
+      pre.report {
+        margin: 0;
+        max-height: 210px;
+        overflow: auto;
+        white-space: pre-wrap;
+        font: 11.5px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace;
+        color: var(--muted);
+      }
+      details > summary { cursor: pointer; color: var(--muted); font-size: 12px; }
+      .hint { font-size: 11.5px; color: var(--faint); }
+    </style>
+  </head>
+  <body>
+    <div class="titlebar">
+      <h1>壁纸 · 背景虚化</h1>
+      <span class="pill" id="status">读取中…</span>
+      <span class="grow"></span>
+      <span class="hint" id="host"></span>
+    </div>
+
+    <div class="stack">
+      <div class="banner" id="error" hidden></div>
+
+      <div class="drop" id="drop" role="button" tabindex="0" aria-label="选择或拖入壁纸图片">
+        <b id="drop-title">把图片拖到这里</b>
+        <span id="drop-hint">或者点击选择文件 · 支持 PNG / JPG / WEBP / AVIF / SVG · 单张 ≤ 4 MB</span>
+        <input id="picker" type="file" accept="image/png,image/jpeg,image/webp,image/avif,image/svg+xml" hidden />
+      </div>
+
+      <div class="card" id="current" hidden>
+        <div class="thumb" id="thumb"></div>
+        <div class="row" style="margin-top: 10px">
+          <div class="grow">
+            <div class="name" id="cur-name">—</div>
+            <div class="path" id="cur-path"></div>
+          </div>
+          <button id="next" hidden>下一张</button>
+          <button id="clear">移除壁纸</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="row">
+          <label class="field">
+            <span class="field-title">背景虚化 <b id="blur-val">16 px</b></span>
+            <input type="range" id="blur" min="0" max="40" step="1" value="16" />
+          </label>
+          <label class="field">
+            <span class="field-title">背景压暗 <b id="dim-val">20 %</b></span>
+            <input type="range" id="dim" min="0" max="70" step="1" value="20" />
+          </label>
+          <label class="field">
+            <span class="field-title">壁纸提亮 <b id="lift-val">0 %</b></span>
+            <input type="range" id="lift" min="0" max="60" step="1" value="0" />
+          </label>
+          <label class="field">
+            <span class="field-title">两侧栏遮罩 <b id="glass-val">22 %</b></span>
+            <input type="range" id="glass" min="0" max="100" step="1" value="22" />
+          </label>
+        </div>
+        <div class="row" style="margin-top: 12px">
+          <label class="field">
+            <span class="field-title">压暗色</span>
+            <select id="veil">
+              <option value="ink">纯黑（中性）</option>
+              <option value="slate">冷灰</option>
+              <option value="blue">深蓝</option>
+              <option value="violet">暗紫</option>
+              <option value="warm">暖棕</option>
+              <option value="none">不压暗</option>
+            </select>
+          </label>
+          <label class="field">
+            <span class="field-title">适配方式</span>
+            <select id="fit">
+              <option value="cover">铺满窗口（裁切边缘）</option>
+              <option value="contain">完整显示（留边）</option>
+              <option value="center">原始大小居中</option>
+              <option value="tile">平铺</option>
+            </select>
+          </label>
+          <label class="field">
+            <span class="field-title">界面明暗基底</span>
+            <select id="base">
+              <option value="auto">跟随桌面端（推荐）</option>
+              <option value="dark">暗色（照片壁纸推荐）</option>
+              <option value="light">亮色（只适合亮图）</option>
+            </select>
+          </label>
+        </div>
+        <div class="row" style="margin-top: 12px">
+          <button class="primary" id="apply">设为当前壁纸</button>
+          <button id="reset" title="把参数回退到推荐值（压暗 20 / 提亮 0 / 遮罩 22 / 基底 auto）">恢复正常外观</button>
+          <button id="check">兼容性自检</button>
+          <span class="grow"></span>
+          <span class="hint" id="saved"></span>
+        </div>
+      </div>
+
+      <details id="report-box" hidden>
+        <summary>自检结果</summary>
+        <pre class="report" id="report"></pre>
+      </details>
+
+      <p class="hint">
+        拖进来即生效：图片只被引用路径，插件不复制、不上传；关掉本面板不影响壁纸。模糊只作用于壁纸，界面文字保持清晰。
+      </p>
+    </div>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      const bridge = window.pluginBridge;
+      const current = { state: null };
+
+      /* ------------------------------------------------------------ 与插件主进程通信 */
+
+      async function call(channel, payload) {
+        if (!bridge || typeof bridge.invoke !== "function") {
+          throw new Error("面板 bridge 不可用（宿主版本不匹配？）");
+        }
+        return bridge.invoke(channel, payload || {});
+      }
+
+      function setError(message) {
+        const box = $("error");
+        box.textContent = message || "";
+        box.hidden = !message;
+      }
+
+      function fileName(path) {
+        if (!path) return "—";
+        return path.split(/[\\/]/).pop();
+      }
+
+      /* ------------------------------------------------------------ 缩略图 */
+
+      const thumbProbe = new Image();
+      /** 缩略图走宿主的资源 scheme；取不到就留空，不影响主流程。 */
+      function setThumb(url) {
+        const thumb = $("thumb");
+        if (!url) {
+          thumb.style.backgroundImage = "";
+          return;
+        }
+        thumbProbe.onload = () => {
+          thumb.style.backgroundImage = 'url("' + url + '")';
+        };
+        thumbProbe.onerror = () => {
+          thumb.style.backgroundImage = "";
+        };
+        thumbProbe.src = url;
+      }
+
+      /* ------------------------------------------------------------ 渲染 */
+
+      function render(s) {
+        if (!s) return;
+        current.state = s;
+        $("host").textContent = s.hostVersion ? "宿主 " + s.hostVersion : "";
+        $("status").textContent = s.active ? "壁纸已应用" : s.imagePath ? "已配置，未应用" : "尚未选择图片";
+        $("status").className = s.active ? "pill on" : "pill";
+
+        const hasImage = Boolean(s.imagePath);
+        $("current").hidden = !hasImage;
+        if (hasImage) {
+          $("cur-name").textContent =
+            fileName(s.imagePath) + (s.pathCount > 1 ? "（第 " + (s.index + 1) + "/" + s.pathCount + " 张）" : "");
+          $("cur-path").textContent = s.imagePath;
+          $("next").hidden = s.pathCount < 2;
+          setThumb(s.previewUrl);
+        } else {
+          setThumb(null);
+        }
+        $("drop-title").textContent = hasImage ? "换一张：把图片拖到这里" : "把图片拖到这里";
+        if (s.limits && Array.isArray(s.limits.extensions)) {
+          $("drop-hint").textContent =
+            "或者点击选择文件 · 支持 " +
+            s.limits.extensions.map((e) => e.toUpperCase()).join(" / ") +
+            " · 单张 ≤ " +
+            Math.round((s.limits.maxBytes || 4194304) / 1024 / 1024) +
+            " MB";
+        }
+
+        if (document.activeElement !== $("blur")) $("blur").value = String(s.blur);
+        if (document.activeElement !== $("dim")) $("dim").value = String(s.dim);
+        $("blur-val").textContent = s.blur + " px";
+        $("dim-val").textContent = s.dim + " %";
+        if (document.activeElement !== $("glass")) $("glass").value = String(s.glass);
+        $("glass-val").textContent = s.glass + " %";
+        if (document.activeElement !== $("lift")) $("lift").value = String(s.lift);
+        $("lift-val").textContent = s.lift + " %";
+        $("veil").value = s.veil;
+        $("fit").value = s.fit;
+        $("base").value = s.baseMode || "auto";
+
+        if (s.check && s.check.length) {
+          $("report").textContent = s.check.join("\n");
+          $("report-box").hidden = false;
+          $("report-box").open = true;
+        }
+        setError(s.error || s.lastError || "");
+      }
+
+      function flash(note) {
+        $("saved").textContent = note || "";
+        window.setTimeout(() => {
+          $("saved").textContent = "";
+        }, 1600);
+      }
+
+      async function refresh() {
+        try {
+          render(await call("wallpaper.state"));
+        } catch (error) {
+          setError("读取状态失败：" + (error && error.message ? error.message : error));
+        }
+      }
+
+      async function save(patch, note) {
+        try {
+          setError("");
+          render(await call("wallpaper.save", patch));
+          if (note) flash(note);
+        } catch (error) {
+          setError("操作失败：" + (error && error.message ? error.message : error));
+        }
+      }
+
+      /* ------------------------------------------------------------ 选择图片 */
+
+      async function useFile(file) {
+        if (!file) return;
+        const path = bridge && typeof bridge.getDroppedFilePath === "function" ? bridge.getDroppedFilePath(file) : null;
+        if (!path) {
+          setError(
+            "拿不到这个文件的绝对路径（宿主这一版没提供取路径的 API）。可以到「扩展 → 壁纸 → 插件设置」里手填绝对路径。",
+          );
+          return;
+        }
+        $("drop-title").textContent = "正在应用…";
+        await save({ imagePath: path }, "已应用");
+        $("drop-title").textContent = "换一张：把图片拖到这里";
+      }
+
+      $("drop").addEventListener("click", () => $("picker").click());
+      $("drop").addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          $("picker").click();
+        }
+      });
+      $("picker").addEventListener("change", async (event) => {
+        const file = event.target.files && event.target.files[0];
+        event.target.value = "";
+        await useFile(file);
+      });
+      ["dragenter", "dragover"].forEach((type) => {
+        $("drop").addEventListener(type, (event) => {
+          event.preventDefault();
+          $("drop").classList.add("hot");
+        });
+      });
+      ["dragleave", "dragend"].forEach((type) => {
+        $("drop").addEventListener(type, () => $("drop").classList.remove("hot"));
+      });
+      $("drop").addEventListener("drop", async (event) => {
+        event.preventDefault();
+        $("drop").classList.remove("hot");
+        const files = event.dataTransfer && event.dataTransfer.files;
+        await useFile(files && files[0]);
+      });
+
+      /* ------------------------------------------------------------ 参数 */
+
+      let debounce = 0;
+      function scheduleSave(patch) {
+        window.clearTimeout(debounce);
+        debounce = window.setTimeout(() => save(patch), 200);
+      }
+
+      $("blur").addEventListener("input", () => {
+        $("blur-val").textContent = $("blur").value + " px";
+        scheduleSave({ blur: Number($("blur").value) });
+      });
+      $("dim").addEventListener("input", () => {
+        $("dim-val").textContent = $("dim").value + " %";
+        scheduleSave({ dim: Number($("dim").value) });
+      });
+      $("glass").addEventListener("input", () => {
+        $("glass-val").textContent = $("glass").value + " %";
+        scheduleSave({ glass: Number($("glass").value) });
+      });
+      $("lift").addEventListener("input", () => {
+        $("lift-val").textContent = $("lift").value + " %";
+        scheduleSave({ lift: Number($("lift").value) });
+      });
+      $("veil").addEventListener("change", () => save({ veil: $("veil").value }, "已更新"));
+      $("base").addEventListener("change", () => save({ base: $("base").value }, "已更新"));
+      $("fit").addEventListener("change", () => save({ fit: $("fit").value }, "已更新"));
+
+      $("apply").addEventListener("click", () => save({}, "已应用"));
+      $("next").addEventListener("click", () => {
+        const s = current.state;
+        if (!s || s.pathCount < 2) return;
+        save({ index: (s.index + 1) % s.pathCount }, "已切换");
+      });
+      $("clear").addEventListener("click", async () => {
+        try {
+          setError("");
+          render(await call("wallpaper.clear"));
+          $("report-box").hidden = true;
+          flash("已移除");
+        } catch (error) {
+          setError("移除失败：" + (error && error.message ? error.message : error));
+        }
+      });
+      $("check").addEventListener("click", async () => {
+        try {
+          render(await call("wallpaper.check"));
+        } catch (error) {
+          setError("自检失败：" + (error && error.message ? error.message : error));
+        }
+      });
+      $("reset").addEventListener("click", async () => {
+        try {
+          setError("");
+          render(await call("wallpaper.reset"));
+          flash("已恢复正常外观");
+        } catch (error) {
+          setError("恢复失败：" + (error && error.message ? error.message : error));
+        }
+      });
+
+      /* ------------------------------------------------------------ 跟随应用亮/暗 */
+
+      function syncBase(appearance) {
+        document.documentElement.dataset.base = appearance && appearance.base === "light" ? "light" : "dark";
+      }
+
+      if (bridge && typeof bridge.on === "function") {
+        bridge.on("appearance:changed", (appearance) => syncBase(appearance));
+      }
+
+      (async () => {
+        let appearance = null;
+        try {
+          appearance = await call("app.getAppearance");
+        } catch {
+          appearance = null;
+        }
+        syncBase(appearance);
+        await refresh();
+      })();
+    </script>
+  </body>
+</html>

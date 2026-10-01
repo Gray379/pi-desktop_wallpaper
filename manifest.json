@@ -1,0 +1,230 @@
+{
+  "schemaVersion": 1,
+  "id": "local.pi-wallpaper",
+  "name": "壁纸 · 背景虚化",
+  "version": "0.4.3",
+  "description": "把本地图片当成 PI-Desktop 的整窗壁纸并做背景虚化：图片只被引用路径，不复制、不上传；界面改成毛玻璃，虚化强度、压暗、两侧栏遮罩强度、适配方式都能实时调 —— 两侧栏可以调到「和中间栏完全一样」，也可以只比中间略暗一点。",
+  "i18n": {
+    "en": {
+      "name": "Wallpaper · Background Blur",
+      "description": "Use a local image as the full-window PI-Desktop wallpaper with background blur. The image is referenced by path only — never copied or uploaded. Panels turn into frosted glass, and blur, dimming and fit are live settings."
+    },
+    "zh-CN": {
+      "name": "壁纸 · 背景虚化",
+      "description": "把本地图片当成 PI-Desktop 的整窗壁纸并做背景虚化：图片只被引用路径，不复制、不上传；界面改成毛玻璃，虚化强度、压暗、两侧栏遮罩强度、适配方式都能实时调 —— 两侧栏可以调到「和中间栏完全一样」，也可以只比中间略暗一点。"
+    }
+  },
+  "author": "local",
+  "main": "main.js",
+  "permissions": [
+    "ui.theme",
+    "ui.panel"
+  ],
+  "ui": {
+    "panel": "renderer/index.html",
+    "title": "壁纸 · 背景虚化"
+  },
+  "engines": {
+    "piDesktop": ">=0.15.0"
+  },
+  "contributes": {
+    "commands": [
+      {
+        "id": "local.pi-wallpaper.openPanel",
+        "title": "壁纸：打开面板（拖图即用）",
+        "keywords": [
+          "壁纸",
+          "wallpaper",
+          "面板",
+          "panel",
+          "背景",
+          "模糊"
+        ]
+      },
+      {
+        "id": "local.pi-wallpaper.apply",
+        "title": "壁纸：应用本地图片（按设置的路径）",
+        "keywords": [
+          "壁纸",
+          "wallpaper",
+          "背景",
+          "模糊",
+          "blur"
+        ]
+      },
+      {
+        "id": "local.pi-wallpaper.next",
+        "title": "壁纸：下一张（多张图片轮换）",
+        "keywords": [
+          "壁纸",
+          "wallpaper",
+          "下一张",
+          "轮换"
+        ]
+      },
+      {
+        "id": "local.pi-wallpaper.clear",
+        "title": "壁纸：移除壁纸（恢复桌面端默认底色）",
+        "keywords": [
+          "壁纸",
+          "wallpaper",
+          "清除",
+          "恢复"
+        ]
+      },
+      {
+        "id": "local.pi-wallpaper.selfCheck",
+        "title": "壁纸：兼容性自检（桌面端升级后先跑这个）",
+        "keywords": [
+          "壁纸",
+          "wallpaper",
+          "自检",
+          "兼容",
+          "版本"
+        ]
+      },
+      {
+        "id": "local.pi-wallpaper.reset",
+        "title": "壁纸：恢复正常外观（回退到推荐参数）",
+        "keywords": [
+          "壁纸",
+          "wallpaper",
+          "重置",
+          "回退",
+          "恢复",
+          "默认"
+        ]
+      }
+    ],
+    "settings": [
+      {
+        "key": "imagePath",
+        "type": "string",
+        "default": "",
+        "title": "壁纸图片路径（绝对路径，一行一张）",
+        "description": "示例：C:/Users/你/Pictures/bg.jpg。在资源管理器里 Shift+右键文件 →「复制文件地址」即可，插件会自动去掉引号与 file:/// 前缀。填多行时可以配合「壁纸：下一张」轮换。宿主只接受 png / jpg / jpeg / webp / avif / svg，单文件 ≤ 4 MB。"
+      },
+      {
+        "key": "index",
+        "type": "number",
+        "default": 0,
+        "title": "当前使用第几张（从 0 开始）",
+        "description": "只有填了多行路径时才需要关心；「壁纸：下一张」会自动改这个值。"
+      },
+      {
+        "key": "blur",
+        "type": "number",
+        "default": 16,
+        "title": "背景虚化强度（像素，0–40）",
+        "description": "只虚化壁纸本身，界面文字保持清晰；0 表示不使用虚化。"
+      },
+      {
+        "key": "dim",
+        "type": "number",
+        "default": 20,
+        "title": "背景压暗（百分比，0–70）",
+        "description": "在壁纸上盖一层半透明色，亮色图片下也能看清白字；0 表示不压暗。"
+      },
+      {
+        "key": "lift",
+        "type": "number",
+        "default": 0,
+        "title": "壁纸提亮（百分比，0–60）",
+        "description": "在壁纸上再叠一层半透明白，把图片偏暗的部分（比如某一边很黑）抬起来。它和「压暗」作用相反：压暗是把整体变暗，提亮对暗部是加法，所以暗角最明显。0 = 关闭。"
+      },
+      {
+        "key": "glass",
+        "type": "number",
+        "default": 22,
+        "title": "两侧栏遮罩强度（0–100）",
+        "description": "左/右两侧栏盖在壁纸上的深浅：0 = 和中间栏完全一样（壁纸原样透出），数值越大越暗越不透明。默认 22 只是比中间略暗一点；想和中间完全一致就拖到 0。输入栏和设置卡片会在此基础上略高一点，保证文字可读。"
+      },
+      {
+        "key": "veil",
+        "type": "select",
+        "default": "ink",
+        "title": "压暗色",
+        "enum": [
+          {
+            "value": "ink",
+            "label": "纯黑（中性）"
+          },
+          {
+            "value": "slate",
+            "label": "冷灰"
+          },
+          {
+            "value": "blue",
+            "label": "深蓝"
+          },
+          {
+            "value": "violet",
+            "label": "暗紫"
+          },
+          {
+            "value": "warm",
+            "label": "暖棕"
+          },
+          {
+            "value": "none",
+            "label": "不压暗"
+          }
+        ]
+      },
+      {
+        "key": "fit",
+        "type": "select",
+        "default": "cover",
+        "title": "适配方式",
+        "enum": [
+          {
+            "value": "cover",
+            "label": "铺满窗口（裁切边缘）"
+          },
+          {
+            "value": "contain",
+            "label": "完整显示（留边）"
+          },
+          {
+            "value": "center",
+            "label": "原始大小居中"
+          },
+          {
+            "value": "tile",
+            "label": "平铺"
+          }
+        ]
+      },
+      {
+        "key": "base",
+        "type": "select",
+        "default": "auto",
+        "title": "界面明暗基底",
+        "description": "壁纸主题用亮色还是暗色配色。auto = 跟随你在桌面端里真正选过的内置亮/暗（没得跟就用暗色）；**暗色下白字压在照片上最清楚，浅色下界面会变白、文字变深色，仅适合很亮的图**。",
+        "enum": [
+          {
+            "value": "auto",
+            "label": "跟随桌面端（推荐）"
+          },
+          {
+            "value": "dark",
+            "label": "暗色（照片壁纸推荐）"
+          },
+          {
+            "value": "light",
+            "label": "亮色（只适合亮图）"
+          }
+        ]
+      }
+    ]
+  },
+  "activationEvents": [
+    "onStartup",
+    "onCommand:local.pi-wallpaper.openPanel",
+    "onCommand:local.pi-wallpaper.apply",
+    "onCommand:local.pi-wallpaper.next",
+    "onCommand:local.pi-wallpaper.clear",
+    "onCommand:local.pi-wallpaper.selfCheck",
+    "onCommand:local.pi-wallpaper.reset"
+  ]
+}

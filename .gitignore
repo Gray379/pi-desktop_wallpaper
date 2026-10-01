@@ -1,0 +1,13 @@
+# 打包产物（用 PluginPack 生成，发 Release 时再上传，不入库）
+dist/
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# 万一以后引入依赖
+node_modules/
